@@ -3,10 +3,10 @@
 const Fs = require('fs');
 const Path = require('path');
 const Code = require('code');
-const Insync = require('insync');
 const Lab = require('lab');
 const StandIn = require('stand-in');
-const Zip = require('jszip');
+const Unzip = require('yauzl');
+const Zip = require('yazl');
 const Zipit = require('../lib');
 
 const lab = exports.lab = Lab.script();
@@ -18,31 +18,64 @@ const fixturesDirectory = Path.join(__dirname, 'fixtures');
 
 
 function unzip (buffer, callback) {
-  Zip.loadAsync(buffer).then((zip) => {
-    zip.generateAsync({
-      type: 'nodebuffer',
-      compression: 'STORE',
-      platform: process.platform
-    })
-    .then((data) => {
-      Insync.each(Object.keys(zip.files), (key, next) => {
-        const file = zip.files[key];
+  const result = { files: {} };
 
-        if (file.dir) {
-          return next();
+  Unzip.fromBuffer(buffer, (err, zip) => {
+    if (err) {
+      return callback(err);
+    }
+
+    zip.on('error', function onError (err) {
+      zip.close();
+      callback(err);
+    });
+
+    zip.on('end', function onEnd () {
+      zip.close();
+    });
+
+    if (zip.entryCount === 0) {
+      return callback(null, result);
+    }
+
+    let processed = 0;
+
+    zip.on('entry', function onEntry (entry) {
+      zip.openReadStream(entry, (err, stream) => {
+        if (err) {
+          return callback(err);
         }
 
-        file.async('nodebuffer')
-          .then((content) => {
-            file._asBuffer = content;
-            next();
-          })
-          .catch((err) => { next(err); });
-      }, (err) => {
-        callback(err, zip, data);
+        const chunks = [];
+        let outputSize = 0;
+
+        stream.on('error', (err) => {
+          callback(err);
+        });
+
+        stream.on('data', (chunk) => {
+          outputSize += chunk.length;
+          chunks.push(chunk);
+        });
+
+        stream.on('finish', () => {
+          const output = Buffer.concat(chunks, outputSize);
+
+          result.files[entry.fileName] = {
+            entry,
+            name: entry.fileName,
+            mode: ((entry.externalFileAttributes >> 16) & 0xfff).toString(8),
+            _asBuffer: output
+          };
+
+          processed++;
+
+          if (processed >= zip.entryCount) {
+            callback(null, result);
+          }
+        });
       });
-    })
-    .catch((err) => { callback(err); });
+    });
   });
 }
 
@@ -58,7 +91,7 @@ describe('Zipit', () => {
       expect(err).to.not.exist();
       expect(buffer).to.be.an.instanceOf(Buffer);
 
-      unzip(buffer, (err, zip, data) => {
+      unzip(buffer, (err, zip) => {
         expect(err).to.not.exist();
 
         const file = zip.files['file.js'];
@@ -66,7 +99,6 @@ describe('Zipit', () => {
         expect(Object.keys(zip.files).length).to.equal(1);
         expect(file).to.be.an.object();
         expect(file.name).to.equal('file.js');
-        expect(file.dir).to.be.false();
         expect(file._asBuffer).to.equal(Fs.readFileSync(input));
         done();
       });
@@ -93,22 +125,69 @@ describe('Zipit', () => {
 
         expect(dir).to.be.an.object();
         expect(dir.name).to.equal('directory/');
-        expect(dir.dir).to.be.true();
 
         expect(subdir).to.be.an.object();
         expect(subdir.name).to.equal('directory/subdirectory/');
-        expect(subdir.dir).to.be.true();
 
         expect(dirFile).to.be.an.object();
         expect(dirFile.name).to.equal('directory/dir-file.js');
-        expect(dirFile.dir).to.be.false();
         expect(dirFile._asBuffer).to.equal(Fs.readFileSync(
           Path.join(fixturesDirectory, 'directory', 'dir-file.js'))
         );
 
         expect(subdirFile).to.be.an.object();
         expect(subdirFile.name).to.equal('directory/subdirectory/subdir-file.js');
-        expect(subdirFile.dir).to.be.false();
+        expect(subdirFile._asBuffer).to.equal(Fs.readFileSync(
+          Path.join(fixturesDirectory, 'directory', 'subdirectory', 'subdir-file.js'))
+        );
+
+        done();
+      });
+    });
+  });
+
+  it('creates a zip from a file and directory', (done) => {
+    Zipit({
+      input: [
+        Path.join(fixturesDirectory, 'file.js'),
+        Path.join(fixturesDirectory, 'directory')
+      ],
+      cwd: fixturesDirectory
+    }, (err, buffer) => {
+      expect(err).to.not.exist();
+      expect(buffer).to.be.an.instanceOf(Buffer);
+
+      unzip(buffer, (err, zip, data) => {
+        expect(err).to.not.exist();
+
+        const file = zip.files['file.js'];
+        const dir = zip.files['directory/'];
+        const subdir = zip.files['directory/subdirectory/'];
+        const dirFile = zip.files['directory/dir-file.js'];
+        const subdirFile = zip.files['directory/subdirectory/subdir-file.js'];
+
+        expect(Object.keys(zip.files).length).to.equal(5);
+
+        expect(file).to.be.an.object();
+        expect(file.name).to.equal('file.js');
+        expect(file._asBuffer).to.equal(Fs.readFileSync(
+          Path.join(fixturesDirectory, 'file.js')
+        ));
+
+        expect(dir).to.be.an.object();
+        expect(dir.name).to.equal('directory/');
+
+        expect(subdir).to.be.an.object();
+        expect(subdir.name).to.equal('directory/subdirectory/');
+
+        expect(dirFile).to.be.an.object();
+        expect(dirFile.name).to.equal('directory/dir-file.js');
+        expect(dirFile._asBuffer).to.equal(Fs.readFileSync(
+          Path.join(fixturesDirectory, 'directory', 'dir-file.js'))
+        );
+
+        expect(subdirFile).to.be.an.object();
+        expect(subdirFile.name).to.equal('directory/subdirectory/subdir-file.js');
         expect(subdirFile._asBuffer).to.equal(Fs.readFileSync(
           Path.join(fixturesDirectory, 'directory', 'subdirectory', 'subdir-file.js'))
         );
@@ -129,6 +208,7 @@ describe('Zipit', () => {
 
       unzip(buffer, (err, zip, data) => {
         expect(err).to.not.exist();
+
         expect(Object.keys(zip.files).length).to.equal(2);
 
         const file1 = zip.files['abc.ini'];
@@ -136,13 +216,13 @@ describe('Zipit', () => {
 
         expect(file1).to.be.an.object();
         expect(file1.name).to.equal('abc.ini');
-        expect(file1.dir).to.be.false();
         expect(file1._asBuffer).to.equal(new Buffer('foo-bar-baz'));
+        expect(file1.mode).to.equal('755');
 
         expect(file2).to.be.an.object();
         expect(file2.name).to.equal('xyz.txt');
-        expect(file2.dir).to.be.false();
         expect(file2._asBuffer).to.equal(new Buffer('blah-blah-blah'));
+        expect(file2.mode).to.equal('755');
         done();
       });
     });
@@ -151,10 +231,8 @@ describe('Zipit', () => {
   it('handles errors during zip creation', (done) => {
     const input = Path.join(fixturesDirectory, 'file.js');
 
-    StandIn.replace(Zip.prototype, 'generateAsync', () => {
-      return new Promise((resolve, reject) => {
-        reject(new Error('foo'));
-      });
+    StandIn.replace(Zip.ZipFile.prototype, 'end', function end () {
+      this.outputStream.emit('error', new Error('foo'));
     }, { stopAfter: 1 });
 
     Zipit({
@@ -209,24 +287,7 @@ describe('Zipit', () => {
     });
   });
 
-  it('handles fs.readFile() errors', (done) => {
-    const input = Path.join(fixturesDirectory, 'file.js');
-
-    StandIn.replace(Fs, 'readFile', (stand, file, callback) => {
-      callback(new Error('foo'));
-    }, { stopAfter: 1 });
-
-    Zipit({
-      input,
-      cwd: fixturesDirectory
-    }, (err, buffer) => {
-      expect(err).to.be.an.error('foo');
-      expect(buffer).to.not.exist();
-      done();
-    });
-  });
-
-  it('handles fs.readFile() errors', (done) => {
+  it('handles fs.readdir() errors', (done) => {
     const input = Path.join(fixturesDirectory, 'directory');
 
     StandIn.replace(Fs, 'readdir', (stand, dir, callback) => {
@@ -276,7 +337,6 @@ describe('Zipit', () => {
         expect(Object.keys(zip.files).length).to.equal(1);
         expect(file).to.be.an.object();
         expect(file.name).to.equal('file.js');
-        expect(file.dir).to.be.false();
         expect(file._asBuffer).to.equal(Fs.readFileSync(input));
         done();
       });

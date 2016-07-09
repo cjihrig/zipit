@@ -22,13 +22,14 @@
   },
   "dependencies": {
     "insync": "2.1.1",
-    "jszip": "3.0.0"
+    "yazl": "2.4.1"
   },
   "devDependencies": {
     "belly-button": "2.x.x",
     "code": "3.x.x",
     "lab": "10.x.x",
-    "stand-in": "4.x.x"
+    "stand-in": "4.x.x",
+    "yauzl": "2.6.0"
   },
   "keywords": [
     "zip"
