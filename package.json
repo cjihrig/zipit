@@ -1,6 +1,6 @@
 {
   "name": "zipit",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Easily create zip archives",
   "author": "Continuation Labs <contact@continuation.io> (http://continuation.io/)",
   "main": "lib/index.js",
