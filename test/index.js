@@ -199,7 +199,7 @@ describe('Zipit', () => {
   it('creates a zip from inline data', (done) => {
     Zipit({
       input: [
-        { name: 'abc.ini', data: new Buffer('foo-bar-baz') },
+        { name: 'abc.ini', data: Buffer.from('foo-bar-baz') },
         { name: 'xyz.txt', data: 'blah-blah-blah' }
       ]
     }, (err, buffer) => {
@@ -216,12 +216,12 @@ describe('Zipit', () => {
 
         expect(file1).to.be.an.object();
         expect(file1.name).to.equal('abc.ini');
-        expect(file1._asBuffer).to.equal(new Buffer('foo-bar-baz'));
+        expect(file1._asBuffer).to.equal(Buffer.from('foo-bar-baz'));
         expect(file1.mode).to.equal('755');
 
         expect(file2).to.be.an.object();
         expect(file2.name).to.equal('xyz.txt');
-        expect(file2._asBuffer).to.equal(new Buffer('blah-blah-blah'));
+        expect(file2._asBuffer).to.equal(Buffer.from('blah-blah-blah'));
         expect(file2.mode).to.equal('755');
         done();
       });

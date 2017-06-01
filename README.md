@@ -17,10 +17,10 @@ const Zipit = require('zipit');
 
 Zipit({
   input: [
-    './some_file.js',                                             // File
-    './some_directory',                                           // Directory
-    { name: 'some_buffer.buf', data: new Buffer('foo-bar-baz') }, // Buffer
-    { name: 'some_string.txt', data: 'blah-blah-blah' }           // String
+    './some_file.js',                                              // File
+    './some_directory',                                            // Directory
+    { name: 'some_buffer.buf', data: Buffer.from('foo-bar-baz') }, // Buffer
+    { name: 'some_string.txt', data: 'blah-blah-blah' }            // String
   ],
   cwd: process.cwd()
 }, (err, buffer) => {
