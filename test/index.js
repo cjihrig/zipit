@@ -1,19 +1,14 @@
 'use strict';
-
+const Assert = require('assert');
 const Fs = require('fs');
 const Path = require('path');
-const Code = require('code');
-const Lab = require('lab');
+const Barrier = require('cb-barrier');
+const Lab = require('@hapi/lab');
 const StandIn = require('stand-in');
 const Unzip = require('yauzl');
 const Zip = require('yazl');
 const Zipit = require('../lib');
-
-const lab = exports.lab = Lab.script();
-const expect = Code.expect;
-const describe = lab.describe;
-const it = lab.it;
-
+const { describe, it } = exports.lab = Lab.script();
 const fixturesDirectory = Path.join(__dirname, 'fixtures');
 
 
@@ -81,72 +76,79 @@ function unzip (buffer, callback) {
 
 
 describe('Zipit', () => {
-  it('creates a zip from a single filename', (done) => {
+  it('creates a zip from a single filename', () => {
     const input = Path.join(fixturesDirectory, 'file.js');
+    const barrier = new Barrier();
 
     Zipit({
       input,
       cwd: fixturesDirectory
     }, (err, buffer) => {
-      expect(err).to.not.exist();
-      expect(buffer).to.be.an.instanceOf(Buffer);
+      Assert.strictEqual(err, null);
+      Assert(buffer instanceof Buffer);
 
       unzip(buffer, (err, zip) => {
-        expect(err).to.not.exist();
+        Assert.strictEqual(err, null);
 
         const file = zip.files['file.js'];
 
-        expect(Object.keys(zip.files).length).to.equal(1);
-        expect(file).to.be.an.object();
-        expect(file.name).to.equal('file.js');
-        expect(file._asBuffer).to.equal(Fs.readFileSync(input));
-        done();
+        Assert.deepStrictEqual(Object.keys(zip.files), ['file.js']);
+        Assert(typeof file === 'object' && file !== null);
+        Assert.strictEqual(file.name, 'file.js');
+        Assert.deepStrictEqual(file._asBuffer, Fs.readFileSync(input));
+        barrier.pass();
       });
     });
+
+    return barrier;
   });
 
-  it('creates a zip from a directory name', (done) => {
+  it('creates a zip from a directory name', () => {
+    const barrier = new Barrier();
+
     Zipit({
       input: Path.join(fixturesDirectory, 'directory'),
       cwd: fixturesDirectory
     }, (err, buffer) => {
-      expect(err).to.not.exist();
-      expect(buffer).to.be.an.instanceOf(Buffer);
+      Assert.strictEqual(err, null);
+      Assert(buffer instanceof Buffer);
 
       unzip(buffer, (err, zip, data) => {
-        expect(err).to.not.exist();
+        Assert.strictEqual(err, null);
 
         const dir = zip.files['directory/'];
         const subdir = zip.files['directory/subdirectory/'];
         const dirFile = zip.files['directory/dir-file.js'];
         const subdirFile = zip.files['directory/subdirectory/subdir-file.js'];
 
-        expect(Object.keys(zip.files).length).to.equal(4);
+        Assert.strictEqual(Object.keys(zip.files).length, 4);
 
-        expect(dir).to.be.an.object();
-        expect(dir.name).to.equal('directory/');
+        Assert(typeof dir === 'object' && dir !== null);
+        Assert.strictEqual(dir.name, 'directory/');
 
-        expect(subdir).to.be.an.object();
-        expect(subdir.name).to.equal('directory/subdirectory/');
+        Assert(typeof subdir === 'object' && subdir !== null);
+        Assert.strictEqual(subdir.name, 'directory/subdirectory/');
 
-        expect(dirFile).to.be.an.object();
-        expect(dirFile.name).to.equal('directory/dir-file.js');
-        expect(dirFile._asBuffer).to.equal(Fs.readFileSync(
-          Path.join(fixturesDirectory, 'directory', 'dir-file.js'))
-        );
+        Assert(typeof dirFile === 'object' && dirFile !== null);
+        Assert.strictEqual(dirFile.name, 'directory/dir-file.js');
+        Assert.deepStrictEqual(dirFile._asBuffer,
+          Fs.readFileSync(Path.join(fixturesDirectory, 'directory', 'dir-file.js')));
 
-        expect(subdirFile).to.be.an.object();
-        expect(subdirFile.name).to.equal('directory/subdirectory/subdir-file.js');
-        expect(subdirFile._asBuffer).to.equal(Fs.readFileSync(
-          Path.join(fixturesDirectory, 'directory', 'subdirectory', 'subdir-file.js'))
-        );
+        Assert(typeof subdirFile === 'object' && subdirFile !== null);
+        Assert.strictEqual(subdirFile.name, 'directory/subdirectory/subdir-file.js');
+        Assert.deepStrictEqual(subdirFile._asBuffer,
+          Fs.readFileSync(Path.join(fixturesDirectory, 'directory', 'subdirectory', 'subdir-file.js')));
 
-        done();
+        barrier.pass();
       });
     });
+
+    return barrier;
   });
 
-  it('creates a zip from a file and directory', (done) => {
+  it('creates a zip from a file and directory', () => {
+    const barrier = new Barrier();
+
     Zipit({
       input: [
         Path.join(fixturesDirectory, 'file.js'),
@@ -154,11 +156,11 @@ describe('Zipit', () => {
       ],
       cwd: fixturesDirectory
     }, (err, buffer) => {
-      expect(err).to.not.exist();
-      expect(buffer).to.be.an.instanceOf(Buffer);
+      Assert.strictEqual(err, null);
+      Assert(buffer instanceof Buffer);
 
       unzip(buffer, (err, zip, data) => {
-        expect(err).to.not.exist();
+        Assert.strictEqual(err, null);
 
         const file = zip.files['file.js'];
         const dir = zip.files['directory/'];
@@ -166,103 +168,118 @@ describe('Zipit', () => {
         const dirFile = zip.files['directory/dir-file.js'];
         const subdirFile = zip.files['directory/subdirectory/subdir-file.js'];
 
-        expect(Object.keys(zip.files).length).to.equal(5);
+        Assert.strictEqual(Object.keys(zip.files).length, 5);
 
-        expect(file).to.be.an.object();
-        expect(file.name).to.equal('file.js');
-        expect(file._asBuffer).to.equal(Fs.readFileSync(
-          Path.join(fixturesDirectory, 'file.js')
-        ));
+        Assert(typeof file === 'object' && file !== null);
+        Assert.strictEqual(file.name, 'file.js');
+        Assert.deepStrictEqual(file._asBuffer,
+          Fs.readFileSync(Path.join(fixturesDirectory, 'file.js')));
 
-        expect(dir).to.be.an.object();
-        expect(dir.name).to.equal('directory/');
+        Assert(typeof dir === 'object' && dir !== null);
+        Assert.strictEqual(dir.name, 'directory/');
 
-        expect(subdir).to.be.an.object();
-        expect(subdir.name).to.equal('directory/subdirectory/');
+        Assert(typeof subdir === 'object' && subdir !== null);
+        Assert.strictEqual(subdir.name, 'directory/subdirectory/');
 
-        expect(dirFile).to.be.an.object();
-        expect(dirFile.name).to.equal('directory/dir-file.js');
-        expect(dirFile._asBuffer).to.equal(Fs.readFileSync(
-          Path.join(fixturesDirectory, 'directory', 'dir-file.js'))
-        );
+        Assert(typeof dirFile === 'object' && dirFile !== null);
+        Assert.strictEqual(dirFile.name, 'directory/dir-file.js');
+        Assert.deepStrictEqual(dirFile._asBuffer,
+          Fs.readFileSync(Path.join(fixturesDirectory, 'directory', 'dir-file.js')));
 
-        expect(subdirFile).to.be.an.object();
-        expect(subdirFile.name).to.equal('directory/subdirectory/subdir-file.js');
-        expect(subdirFile._asBuffer).to.equal(Fs.readFileSync(
-          Path.join(fixturesDirectory, 'directory', 'subdirectory', 'subdir-file.js'))
-        );
-        done();
+        Assert(typeof subdirFile === 'object' && subdirFile !== null);
+        Assert.strictEqual(subdirFile.name, 'directory/subdirectory/subdir-file.js');
+        Assert.deepStrictEqual(subdirFile._asBuffer,
+          Fs.readFileSync(Path.join(fixturesDirectory, 'directory', 'subdirectory', 'subdir-file.js')));
+
+        barrier.pass();
       });
     });
+
+    return barrier;
   });
 
-  it('creates a zip from inline data', (done) => {
+  it('creates a zip from inline data', () => {
+    const barrier = new Barrier();
+
     Zipit({
       input: [
         { name: 'abc.ini', data: Buffer.from('foo-bar-baz') },
         { name: 'xyz.txt', data: 'blah-blah-blah' }
       ]
     }, (err, buffer) => {
-      expect(err).to.not.exist();
-      expect(buffer).to.be.an.instanceOf(Buffer);
+      Assert.strictEqual(err, null);
+      Assert(buffer instanceof Buffer);
 
       unzip(buffer, (err, zip, data) => {
-        expect(err).to.not.exist();
+        Assert.strictEqual(err, null);
 
-        expect(Object.keys(zip.files).length).to.equal(2);
+        Assert.strictEqual(Object.keys(zip.files).length, 2);
 
         const file1 = zip.files['abc.ini'];
         const file2 = zip.files['xyz.txt'];
 
-        expect(file1).to.be.an.object();
-        expect(file1.name).to.equal('abc.ini');
-        expect(file1._asBuffer).to.equal(Buffer.from('foo-bar-baz'));
-        expect(file1.mode).to.equal('755');
+        Assert(typeof file1 === 'object' && file1 !== null);
+        Assert.strictEqual(file1.name, 'abc.ini');
+        Assert.deepStrictEqual(file1._asBuffer, Buffer.from('foo-bar-baz'));
+        Assert.strictEqual(file1.mode, '755');
 
-        expect(file2).to.be.an.object();
-        expect(file2.name).to.equal('xyz.txt');
-        expect(file2._asBuffer).to.equal(Buffer.from('blah-blah-blah'));
-        expect(file2.mode).to.equal('755');
-        done();
+        Assert(typeof file2 === 'object' && file2 !== null);
+        Assert.strictEqual(file2.name, 'xyz.txt');
+
+        Assert.deepStrictEqual(file2._asBuffer, Buffer.from('blah-blah-blah'));
+        Assert.strictEqual(file2.mode, '755');
+
+        barrier.pass();
       });
     });
+
+    return barrier;
   });
 
-  it('handles errors during zip creation', (done) => {
+  it('handles errors during zip creation', () => {
+    const barrier = new Barrier();
     const input = Path.join(fixturesDirectory, 'file.js');
+    const error = new Error('foo');
 
     StandIn.replace(Zip.ZipFile.prototype, 'end', function end () {
-      this.outputStream.emit('error', new Error('foo'));
+      this.outputStream.emit('error', error);
     }, { stopAfter: 1 });
 
     Zipit({
       input,
       cwd: fixturesDirectory
     }, (err, buffer) => {
-      expect(err).to.be.an.error('foo');
-      expect(buffer).to.not.exist();
-      done();
+      Assert.strictEqual(err, error);
+      Assert.strictEqual(buffer, undefined);
+      barrier.pass();
     });
+
+    return barrier;
   });
 
-  it('handles fs.stat() errors', (done) => {
+  it('handles fs.stat() errors', () => {
+    const barrier = new Barrier();
     const input = Path.join(fixturesDirectory, 'file.js');
+    const error = new Error('foo');
 
     StandIn.replace(Fs, 'stat', (stand, file, callback) => {
-      callback(new Error('foo'));
+      callback(error);
     }, { stopAfter: 1 });
 
     Zipit({
       input,
       cwd: fixturesDirectory
     }, (err, buffer) => {
-      expect(err).to.be.an.error('foo');
-      expect(buffer).to.not.exist();
-      done();
+      Assert.strictEqual(err, error);
+      Assert.strictEqual(buffer, undefined);
+      barrier.pass();
     });
+
+    return barrier;
   });
 
-  it('ignores things that are not files or directories', (done) => {
+  it('ignores things that are not files or directories', () => {
+    const barrier = new Barrier();
     const input = Path.join(fixturesDirectory, 'file.js');
 
     StandIn.replace(Fs, 'stat', (stand, file, callback) => {
@@ -276,39 +293,48 @@ describe('Zipit', () => {
       input,
       cwd: fixturesDirectory
     }, (err, buffer) => {
-      expect(err).to.not.exist();
-      expect(buffer).to.be.an.instanceOf(Buffer);
+      Assert.strictEqual(err, null);
+      Assert(buffer instanceof Buffer);
 
       unzip(buffer, (err, zip, data) => {
-        expect(err).to.not.exist();
-        expect(Object.keys(zip.files).length).to.equal(0);
-        done();
+        Assert.strictEqual(err, null);
+        Assert.strictEqual(Object.keys(zip.files).length, 0);
+        barrier.pass();
       });
     });
+
+    return barrier;
   });
 
-  it('handles fs.readdir() errors', (done) => {
+  it('handles fs.readdir() errors', () => {
+    const barrier = new Barrier();
     const input = Path.join(fixturesDirectory, 'directory');
+    const error = new Error('foo');
 
     StandIn.replace(Fs, 'readdir', (stand, dir, callback) => {
-      callback(new Error('foo'));
+      callback(error);
     }, { stopAfter: 1 });
 
     Zipit({
       input,
       cwd: fixturesDirectory
     }, (err, buffer) => {
-      expect(err).to.be.an.error('foo');
-      expect(buffer).to.not.exist();
-      done();
+      Assert.strictEqual(err, error);
+      Assert.strictEqual(buffer, undefined);
+      barrier.pass();
     });
+
+    return barrier;
   });
 
-  it('calls back with an error on invalid input', (done) => {
+  it('calls back with an error on invalid input', () => {
+    const barrier = new Barrier();
+
     function fail (input, callback) {
       Zipit({ input }, (err, buffer) => {
-        expect(err).to.be.an.error(TypeError, /input must be a string or object, but got/);
-        expect(buffer).to.not.exist();
+        Assert(err instanceof TypeError);
+        Assert(/input must be a string or object, but got/.test(err.message));
+        Assert.strictEqual(buffer, undefined);
         callback();
       });
     }
@@ -316,30 +342,35 @@ describe('Zipit', () => {
     fail(undefined, () => {
       fail(null, () => {
         fail(123, () => {
-          fail(true, done);
+          fail(true, barrier.pass);
         });
       });
     });
+
+    return barrier;
   });
 
-  it('works with relative paths', (done) => {
+  it('works with relative paths', () => {
+    const barrier = new Barrier();
     const input = './test/fixtures/file.js';
 
     Zipit({ input }, (err, buffer) => {
-      expect(err).to.not.exist();
-      expect(buffer).to.be.an.instanceOf(Buffer);
+      Assert.strictEqual(err, null);
+      Assert(buffer instanceof Buffer);
 
       unzip(buffer, (err, zip, data) => {
-        expect(err).to.not.exist();
+        Assert.strictEqual(err, null);
 
         const file = zip.files['file.js'];
 
-        expect(Object.keys(zip.files).length).to.equal(1);
-        expect(file).to.be.an.object();
-        expect(file.name).to.equal('file.js');
-        expect(file._asBuffer).to.equal(Fs.readFileSync(input));
-        done();
+        Assert.deepStrictEqual(Object.keys(zip.files), ['file.js']);
+        Assert(typeof file === 'object' && file !== null);
+        Assert.strictEqual(file.name, 'file.js');
+        Assert.deepStrictEqual(file._asBuffer, Fs.readFileSync(input));
+        barrier.pass();
       });
     });
+
+    return barrier;
   });
 });
